@@ -1,0 +1,104 @@
+# 1. Hostinimi ja domeeni seadistamine
+/system identity set name=adrian1
+/system identity set domain-name=adrian.vorms.sise  # Asenda %perenimi% oma tegeliku perekonnanimega
+
+# 2. NTP serveri seadistamine
+/system ntp client set enabled=yes primary-ntp=ntp1.eenet.ee secondary-ntp=ntp2.eenet.ee
+
+# 3. VLAN-i seadistamine
+/interface bridge add name=bridge-lan vlan-filtering=yes comment="LAN Bridge"
+/interface vlan add interface=bridge-lan name=vlan10 vlan-id=10 comment="ADM - Administratiivne Võrk"
+/interface vlan add interface=bridge-lan name=vlan20 vlan-id=20 comment="WS - Tööjaama Võrk"
+/interface vlan add interface=bridge-lan name=vlan30 vlan-id=30 comment="GST - Külastaja Võrk"
+/interface vlan add interface=bridge-lan name=vlan40 vlan-id=40 comment="DMZ - Demilitariseeritud Tsoon"
+
+# 4. Füüsiliste portide määramine VLAN-idele
+/interface bridge port add bridge=bridge-lan interface=ether2 pvid=10  # ADM
+/interface bridge port add bridge=bridge-lan interface=ether3 pvid=20  # WS
+/interface bridge port add bridge=bridge-lan interface=ether4 pvid=30  # GST
+/interface bridge port add bridge=bridge-lan interface=ether5 pvid=40  # DMZ
+
+# 5. VLAN-i sildade seadistamine
+/interface bridge vlan add bridge=bridge-lan tagged=bridge-lan untagged=ether2 vlan-ids=10
+/interface bridge vlan add bridge=bridge-lan tagged=bridge-lan untagged=ether3 vlan-ids=20
+/interface bridge vlan add bridge=bridge-lan tagged=bridge-lan untagged=ether4 vlan-ids=30
+/interface bridge vlan add bridge=bridge-lan tagged=bridge-lan untagged=ether5 vlan-ids=40
+
+# 6. IP-aadresside seadistamine VLAN-idele
+/ip address add address=192.168.88.1/24 comment="Silla IP" interface=bridge-lan network=192.168.88.0
+/ip address add address=10.10.10.1/24 comment="VLAN10 IP" interface=vlan10 network=10.10.10.0
+/ip address add address=10.10.20.1/24 comment="VLAN20 IP" interface=vlan20 network=10.10.20.0
+/ip address add address=10.10.30.1/24 comment="VLAN30 IP" interface=vlan30 network=10.10.30.0
+/ip address add address=10.10.40.1/24 comment="VLAN40 IP" interface=vlan40 network=10.10.40.0
+
+# 7. WAN-i seadistamine (DHCP klient port 1-l)
+/ip dhcp-client add comment="WAN DHCP Klient" interface=ether1 use-peer-dns=yes use-peer-ntp=yes
+
+# 8. DHCP basseinid iga VLAN-i jaoks
+/ip pool add name=dhcp_pool_lan ranges=192.168.88.10-192.168.88.254
+/ip pool add name=dhcp_pool_vlan10 ranges=10.10.10.10-10.10.10.254
+/ip pool add name=dhcp_pool_vlan20 ranges=10.10.20.10-10.10.20.254
+/ip pool add name=dhcp_pool_vlan30 ranges=10.10.30.10-10.10.30.254
+/ip pool add name=dhcp_pool_vlan40 ranges=10.10.40.10-10.10.40.254
+
+# 9. DHCP serverid iga VLAN-i jaoks
+/ip dhcp-server add address-pool=dhcp_pool_lan interface=bridge-lan lease-time=10m name=dhcp-lan disabled=no
+/ip dhcp-server add address-pool=dhcp_pool_vlan10 interface=vlan10 lease-time=10m name=dhcp-vlan10 disabled=no
+/ip dhcp-server add address-pool=dhcp_pool_vlan20 interface=vlan20 lease-time=10m name=dhcp-vlan20 disabled=no
+/ip dhcp-server add address-pool=dhcp_pool_vlan30 interface=vlan30 lease-time=10m name=dhcp-vlan30 disabled=no
+/ip dhcp-server add address-pool=dhcp_pool_vlan40 interface=vlan40 lease-time=10m name=dhcp-vlan40 disabled=no
+
+# 10. DHCP võrgu seadistamine iga VLAN-i jaoks
+/ip dhcp-server network add address=10.10.10.0/24 dns-server=8.8.8.8,8.8.4.4 gateway=10.10.10.1
+/ip dhcp-server network add address=10.10.20.0/24 dns-server=8.8.8.8,8.8.4.4 gateway=10.10.20.1
+/ip dhcp-server network add address=10.10.30.0/24 dns-server=8.8.8.8,8.8.4.4 gateway=10.10.30.1
+/ip dhcp-server network add address=10.10.40.0/24 dns-server=8.8.8.8,8.8.4.4 gateway=10.10.40.1
+/ip dhcp-server network add address=192.168.88.0/24 dns-server=8.8.8.8,8.8.4.4 gateway=192.168.88.1
+
+# 11. Tulemüürireeglid
+/ip firewall filter add chain=input action=drop in-interface=ether1 comment="Keela kogu sissetulev WAN liiklus"
+/ip firewall filter add chain=forward action=accept src-address=10.10.10.0/24 dst-address=10.10.20.0/24 comment="Luba ADM <> WS"
+/ip firewall filter add chain=forward action=drop src-address=10.10.30.0/24 dst-address=10.10.10.0/24 comment="Keela GST ADM-ile"
+/ip firewall filter add chain=forward action=drop src-address=10.10.30.0/24 dst-address=10.10.20.0/24 comment="Keela GST WS-ile"
+/ip firewall filter add chain=forward action=drop src-address=10.10.20.0/24 dst-address=10.10.40.0/24 comment="Blokeeri WS DMZ-ile"
+/ip firewall filter add chain=forward action=drop src-address=10.10.30.0/24 dst-address=10.10.40.0/24 comment="Blokeeri GST DMZ-ile"
+/ip firewall filter add chain=forward action=accept protocol=tcp dst-port=80,443 in-interface=ether1 out-interface=vlan40 comment="Luba WAN HTTP/HTTPS DMZ-ile"
+/ip firewall filter add chain=input action=accept protocol=icmp in-interface=ether1 comment="Luba ICMP WAN-ist testimiseks"
+/ip firewall filter add chain=input action=drop in-interface=ether1 comment="Keela kogu sissetulev WAN liiklus"
+
+# 12. NAT seadistamine
+/ip firewall nat add action=masquerade chain=srcnat out-interface=ether1 comment="NAT kõigi LAN-ide jaoks WAN-ile"
+
+/ip firewall nat add action=masquerade chain=srcnat comment="NAT WAN-i jaoks" out-interface=ether1
+
+# 13. Turvaprotseduuride seadistamine
+/certificate authority add name=internal-ca
+/certificate add name=server-cert common-name=adrian.vorms.sise key-size=4096
+/certificate sign server-cert ca=internal-ca
+
+# 14. OpenVPN serveri seadistamine
+/interface ovpn-server server set enabled=yes
+/interface ovpn-server server add interface=bridge-lan certificate=server-cert
+
+# 15. OpenVPN tulemüürireeglid
+/ip firewall filter add chain=input action=accept protocol=tcp dst-port=1194 in-interface=ether1 comment="Luba OpenVPN liiklus WAN-ist"
+
+# 16. IPSec VPN tunnel'i seadistamine
+/ip ipsec peer add address=remote.peer.address secret=mySecret
+/ip ipsec proposal add name=myProposal auth-algorithms=sha1 enc-algorithms=aes-256-cbc
+/ip ipsec policy add src-address=10.10.10.0/24 dst-address=10.10.20.0/24 proposal=myProposal
+
+# 17. Portide edastamine HTTP ja HTTPS DMZ-ile
+/ip firewall nat add chain=dstnat protocol=tcp dst-port=80 action=dst-nat to-addresses=10.11.12.10 to-ports=80
+/ip firewall nat add chain=dstnat protocol=tcp dst-port=443 action=dst-nat to-addresses=10.11.12.10 to-ports=443
+
+# 18. Monit seadistamine
+/tool monit add service="Router Performance" action=monitor timeout=60s
+/tool monit add service="Router Performance" action=notify timeout=60s
+/tool monit set notify=smtp
+/tool monit set smtp-server=smtp.example.com
+
+# 19. Varukoopia seadistamine
+/system scheduler add name="backup-config" interval=1d on-event="/system backup save name=backup"
+
+# Konfiguratsiooni lõpp
