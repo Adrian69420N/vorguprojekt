@@ -72,9 +72,9 @@
 /ip firewall nat add action=masquerade chain=srcnat comment="NAT WAN-i jaoks" out-interface=ether1
 
 # 13. Turvaprotseduuride seadistamine
-/certificate authority add name=internal-ca
-/certificate add name=server-cert common-name=adrian.vorms.sise key-size=4096
-/certificate sign server-cert ca=internal-ca
+/certificate add name=internal-ca common-name="Internal CA" key-size=2048
+/certificate sign internal-ca
+
 
 # 14. OpenVPN serveri seadistamine
 /interface ovpn-server server set enabled=yes
