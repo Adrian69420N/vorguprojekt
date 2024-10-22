@@ -56,15 +56,35 @@
 /ip dhcp-server network add address=192.168.88.0/24 dns-server=8.8.8.8,8.8.4.4 gateway=192.168.88.1
 
 # 11. Tulemüürireeglid
-/ip firewall filter add chain=input action=drop in-interface=ether1 comment="Keela kogu sissetulev WAN liiklus"
-/ip firewall filter add chain=forward action=accept src-address=10.10.10.0/24 dst-address=10.10.20.0/24 comment="Luba ADM <> WS"
-/ip firewall filter add chain=forward action=drop src-address=10.10.30.0/24 dst-address=10.10.10.0/24 comment="Keela GST ADM-ile"
-/ip firewall filter add chain=forward action=drop src-address=10.10.30.0/24 dst-address=10.10.20.0/24 comment="Keela GST WS-ile"
-/ip firewall filter add chain=forward action=drop src-address=10.10.20.0/24 dst-address=10.10.40.0/24 comment="Blokeeri WS DMZ-ile"
-/ip firewall filter add chain=forward action=drop src-address=10.10.30.0/24 dst-address=10.10.40.0/24 comment="Blokeeri GST DMZ-ile"
-/ip firewall filter add chain=forward action=accept protocol=tcp dst-port=80,443 in-interface=ether1 out-interface=vlan40 comment="Luba WAN HTTP/HTTPS DMZ-ile"
-/ip firewall filter add chain=input action=accept protocol=icmp in-interface=ether1 comment="Luba ICMP WAN-ist testimiseks"
-/ip firewall filter add chain=input action=drop in-interface=ether1 comment="Keela kogu sissetulev WAN liiklus"
+# ADM (VLAN 10) > Kõik teised VLAN-id (lubatud)
+add action=accept chain=forward comment="ADM > WS" dst-address=10.10.20.0/24 src-address=10.10.10.0/24
+add action=accept chain=forward comment="ADM > GST" dst-address=10.10.30.0/24 src-address=10.10.10.0/24
+add action=accept chain=forward comment="ADM > DMZ" dst-address=10.10.40.0/24 src-address=10.10.10.0/24
+
+# WS (VLAN 20) > ADM (lubatud), WS > DMZ ja GST (keelatud)
+add action=accept chain=forward comment="WS > ADM" dst-address=10.10.10.0/24 src-address=10.10.20.0/24
+add action=drop chain=forward comment="WS > DMZ" dst-address=10.10.40.0/24 src-address=10.10.20.0/24
+add action=drop chain=forward comment="WS > GST" dst-address=10.10.30.0/24 src-address=10.10.20.0/24
+
+# GST (VLAN 30) > Keelatud liiklus ADM, WS ja DMZ suunas
+add action=drop chain=forward comment="GST > DMZ" dst-address=10.10.40.0/24 src-address=10.10.30.0/24
+add action=drop chain=forward comment="GST > WS" dst-address=10.10.20.0/24 src-address=10.10.30.0/24
+add action=drop chain=forward comment="GST > ADM" dst-address=10.10.10.0/24 src-address=10.10.30.0/24
+
+# DMZ (VLAN 40) > Kõik teised VLAN-id (keelatud)
+add action=drop chain=forward comment="DMZ > ADM" dst-address=10.10.10.0/24 src-address=10.10.40.0/24
+add action=drop chain=forward comment="DMZ > WS" dst-address=10.10.20.0/24 src-address=10.10.40.0/24
+add action=drop chain=forward comment="DMZ > GST" dst-address=10.10.30.0/24 src-address=10.10.40.0/24
+
+# WAN > DMZ (lubatud ainult HTTP ja HTTPS)
+/ip firewall filter
+add action=accept chain=forward comment="WAN > DMZ (https)" dst-address=10.10.40.0/24 dst-port=443 in-interface=ether1 protocol=tcp
+add action=accept chain=forward comment="WAN > DMZ (http)" dst-address=10.10.40.0/24 dst-port=80 in-interface=ether1 protocol=tcp
+
+# WAN > Kõik muu liiklus (keelatud)
+/ip firewall filter
+add action=drop chain=input comment="WAN > NO!" in-interface=ether1
+
 
 # 12. NAT seadistamine
 /ip firewall nat add action=masquerade chain=srcnat out-interface=ether1 comment="NAT kõigi LAN-ide jaoks WAN-ile"
