@@ -77,8 +77,8 @@
 
 
 # 14. OpenVPN serveri seadistamine
-/interface ovpn-server server set enabled=yes
-/interface ovpn-server server add interface=bridge-lan certificate=server-cert
+/interface ovpn-server server set default-profile=default
+
 
 # 15. OpenVPN tulemüürireeglid
 /ip firewall filter add chain=input action=accept protocol=tcp dst-port=1194 in-interface=ether1 comment="Luba OpenVPN liiklus WAN-ist"
@@ -87,6 +87,7 @@
 /ip ipsec peer add address=remote.peer.address secret=mySecret
 /ip ipsec proposal add name=myProposal auth-algorithms=sha1 enc-algorithms=aes-256-cbc
 /ip ipsec policy add src-address=10.10.10.0/24 dst-address=10.10.20.0/24 proposal=myProposal
+
 
 # 17. Portide edastamine HTTP ja HTTPS DMZ-ile
 /ip firewall nat add chain=dstnat protocol=tcp dst-port=80 action=dst-nat to-addresses=10.11.12.10 to-ports=80
