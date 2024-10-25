@@ -91,9 +91,15 @@ add action=drop chain=input comment="WAN > NO!" in-interface=ether1
 
 /ip firewall nat add action=masquerade chain=srcnat comment="NAT WAN-i jaoks" out-interface=ether1
 
-# 13. Turvaprotseduuride seadistamine
+# 13. Turvaprotseduuride seadistamine(alguses sisemine sertifikaat ja siis openvpn srv oma)
 /certificate add name=internal-ca common-name="Internal CA" key-size=2048
 /certificate sign internal-ca
+
+/certificate add name=openvpn-server common-name="OpenVPN Server" key-size=4096
+/certificate sign openvpn-server ca=internal-ca
+
+
+/certificate print #väljastab sinu poolt tehtud sertifikaadid
 
 
 # 14. OpenVPN serveri seadistamine
