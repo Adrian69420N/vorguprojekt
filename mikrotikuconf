@@ -113,13 +113,9 @@ add action=drop chain=input comment="WAN > NO!" in-interface=ether1
 /ip firewall nat add chain=dstnat protocol=tcp dst-port=80 action=dst-nat to-addresses=10.11.12.10 to-ports=80
 /ip firewall nat add chain=dstnat protocol=tcp dst-port=443 action=dst-nat to-addresses=10.11.12.10 to-ports=443
 
-# 18. Monit seadistamine
-/tool monit add service="Router Performance" action=monitor timeout=60s
-/tool monit add service="Router Performance" action=notify timeout=60s
-/tool monit set notify=smtp
-/tool monit set smtp-server=smtp.example.com
 
-# 19. Varukoopia seadistamine
+
+# 18. Varukoopia seadistamine
 /system scheduler add name="backup-config" interval=1d on-event="/system backup save name=backup"
 
 # Konfiguratsiooni lõpp
